@@ -21,6 +21,7 @@ function BdevLib:CreateWindow(options)
     local TextLabel = Instance.new("TextLabel")
     local Window = Instance.new("Frame")
     local UIListLayout = Instance.new("UIListLayout")
+    local UIPadding = Instance.new("UIPadding")
     local IconBtn = Instance.new("ImageButton")
     local UICorner_7 = Instance.new("UICorner")
 
@@ -82,9 +83,14 @@ function BdevLib:CreateWindow(options)
     Window.Position = UDim2.new(0, 0, 0.15289256, 0)
     Window.Size = UDim2.new(0, 193, 0, 205)
     
+    -- Автоматическое расположение элементов
     UIListLayout.Parent = Window
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayout.Padding = UDim.new(0, 8)
+    
+    -- Отступ сверху, чтобы кнопки не заходили в TopBar
+    UIPadding.Parent = Window
+    UIPadding.PaddingTop = UDim.new(0, 10)
 
     IconBtn.Name = "IconBtn"
     IconBtn.Parent = BdevUI
@@ -99,9 +105,9 @@ function BdevLib:CreateWindow(options)
     UICorner_7.Parent = IconBtn
 
     local elementCount = 0
-    local baseMainHeight = 242
-    local baseWindowHeight = 205
     local topBarHeight = 37
+    local paddingTop = 10 -- Отступ от TopBar
+    local minPadding = 20 -- Минимальный отступ снизу
     local buttonHeight = 27
     local toggleHeight = 17
     local spacing = 8
@@ -110,6 +116,7 @@ function BdevLib:CreateWindow(options)
         local totalElementsHeight = 0
         local childCount = 0
         
+        -- Считаем высоту всех элементов
         for _, child in ipairs(Window:GetChildren()) do
             if child:IsA("Frame") and (child.Name == "Button" or child.Name == "Tbutton") then
                 totalElementsHeight = totalElementsHeight + (child.Name == "Button" and buttonHeight or toggleHeight)
@@ -117,15 +124,27 @@ function BdevLib:CreateWindow(options)
             end
         end
         
+        -- Добавляем отступы между элементами
         if childCount > 0 then
             totalElementsHeight = totalElementsHeight + (spacing * (childCount - 1))
         end
         
-        local newWindowHeight = math.max(50, totalElementsHeight + 20)
+        -- Добавляем верхний отступ (от TopBar) и нижний отступ
+        local newWindowHeight = paddingTop + totalElementsHeight + minPadding
+        
+        -- Минимальная высота окна с учетом отступов
+        local minWindowHeight = paddingTop + minPadding
+        newWindowHeight = math.max(minWindowHeight, newWindowHeight)
+        
+        -- Общая высота Main = TopBar + Window
         local newMainHeight = topBarHeight + newWindowHeight
         
+        -- Обновляем размеры
         Main.Size = UDim2.new(0, 193, 0, newMainHeight)
         Window.Size = UDim2.new(0, 193, 0, newWindowHeight)
+        
+        -- Обновляем позицию окна (оно всегда должно быть под TopBar)
+        Window.Position = UDim2.new(0, 0, 0, topBarHeight)
     end
 
     local draggingMain = false
