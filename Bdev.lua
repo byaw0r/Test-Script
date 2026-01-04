@@ -100,12 +100,15 @@ function BdevLib:CreateWindow(options)
 
     -- Флаги для отслеживания перетаскивания
     local draggingMain = false
-    local dragStartMain
-    local startPosMain
-    
     local draggingIcon = false
-    local dragStartIcon
-    local startPosIcon
+    
+    -- Позиции для перетаскивания
+    local mainDragOffset = Vector2.new(0, 0)
+    local iconDragOffset = Vector2.new(0, 0)
+    
+    -- Соединения для обновления позиций
+    local mainRenderConnection
+    local iconRenderConnection
     
     -- Функции для блокировки камеры
     local function blockCamera()
@@ -131,16 +134,43 @@ function BdevLib:CreateWindow(options)
             ContextActionService:UnbindAction("BlockCameraWhileDragging")
         end
     end
-
-    -- Функция для перетаскивания главного окна
-    local function updateMain(input)
-        local delta = input.Position - dragStartMain
-        Main.Position = UDim2.new(
-            startPosMain.X.Scale, 
-            startPosMain.X.Offset + delta.X,
-            startPosMain.Y.Scale, 
-            startPosMain.Y.Offset + delta.Y
-        )
+    
+    -- Функция обновления позиции главного окна через RenderStepped
+    local function updateMainPosition()
+        if draggingMain then
+            local mousePos = UserInputService:GetMouseLocation()
+            local screenSize = BdevUI.AbsoluteSize
+            
+            -- Вычисляем новую позицию с учетом смещения
+            local newX = mousePos.X - mainDragOffset.X
+            local newY = mousePos.Y - mainDragOffset.Y
+            
+            -- Ограничиваем позицию в пределах экрана
+            newX = math.clamp(newX, 0, screenSize.X - Main.AbsoluteSize.X)
+            newY = math.clamp(newY, 0, screenSize.Y - Main.AbsoluteSize.Y)
+            
+            -- Устанавливаем новую позицию
+            Main.Position = UDim2.new(0, newX, 0, newY)
+        end
+    end
+    
+    -- Функция обновления позиции иконки через RenderStepped
+    local function updateIconPosition()
+        if draggingIcon then
+            local mousePos = UserInputService:GetMouseLocation()
+            local screenSize = BdevUI.AbsoluteSize
+            
+            -- Вычисляем новую позицию с учетом смещения
+            local newX = mousePos.X - iconDragOffset.X
+            local newY = mousePos.Y - iconDragOffset.Y
+            
+            -- Ограничиваем позицию в пределах экрана
+            newX = math.clamp(newX, 0, screenSize.X - IconBtn.AbsoluteSize.X)
+            newY = math.clamp(newY, 0, screenSize.Y - IconBtn.AbsoluteSize.Y)
+            
+            -- Устанавливаем новую позицию
+            IconBtn.Position = UDim2.new(0, newX, 0, newY)
+        end
     end
     
     -- Начинаем перетаскивание главного окна
@@ -152,25 +182,32 @@ function BdevLib:CreateWindow(options)
                 blockCamera()
             end
             
+            -- Запоминаем смещение от угла элемента до точки нажатия
+            local mousePos = UserInputService:GetMouseLocation()
+            local elementPos = Main.AbsolutePosition
+            mainDragOffset = Vector2.new(mousePos.X - elementPos.X, mousePos.Y - elementPos.Y)
+            
+            -- Начинаем перетаскивание
             draggingMain = true
-            dragStartMain = input.Position
-            startPosMain = Main.Position
-        end
-    end)
-    
-    -- Обрабатываем перетаскивание главного окна
-    UserInputService.InputChanged:Connect(function(input)
-        if draggingMain and (input.UserInputType == Enum.UserInputType.MouseMovement or
-           input.UserInputType == Enum.UserInputType.Touch) then
-            updateMain(input)
+            
+            -- Запускаем обновление позиции через RenderStepped
+            if not mainRenderConnection then
+                mainRenderConnection = RunService.RenderStepped:Connect(updateMainPosition)
+            end
         end
     end)
     
     -- Завершаем перетаскивание главного окна
     TopBar.InputEnded:Connect(function(input)
-        if draggingMain and (input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch) then
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or 
+            input.UserInputType == Enum.UserInputType.Touch) and draggingMain then
             draggingMain = false
+            
+            -- Отключаем обновление позиции
+            if mainRenderConnection then
+                mainRenderConnection:Disconnect()
+                mainRenderConnection = nil
+            end
             
             -- Для тач-устройств разблокируем камеру
             if input.UserInputType == Enum.UserInputType.Touch then
@@ -178,17 +215,6 @@ function BdevLib:CreateWindow(options)
             end
         end
     end)
-    
-    -- Функция для перетаскивания иконки
-    local function updateIcon(input)
-        local delta = input.Position - dragStartIcon
-        IconBtn.Position = UDim2.new(
-            startPosIcon.X.Scale,
-            startPosIcon.X.Offset + delta.X,
-            startPosIcon.Y.Scale,
-            startPosIcon.Y.Offset + delta.Y
-        )
-    end
     
     -- Начинаем перетаскивание иконки
     IconBtn.InputBegan:Connect(function(input)
@@ -199,27 +225,67 @@ function BdevLib:CreateWindow(options)
                 blockCamera()
             end
             
+            -- Запоминаем смещение от угла элемента до точки нажатия
+            local mousePos = UserInputService:GetMouseLocation()
+            local elementPos = IconBtn.AbsolutePosition
+            iconDragOffset = Vector2.new(mousePos.X - elementPos.X, mousePos.Y - elementPos.Y)
+            
+            -- Начинаем перетаскивание
             draggingIcon = true
-            dragStartIcon = input.Position
-            startPosIcon = IconBtn.Position
-        end
-    end)
-    
-    -- Обрабатываем перетаскивание иконки
-    UserInputService.InputChanged:Connect(function(input)
-        if draggingIcon and (input.UserInputType == Enum.UserInputType.MouseMovement or
-           input.UserInputType == Enum.UserInputType.Touch) then
-            updateIcon(input)
+            
+            -- Запускаем обновление позиции через RenderStepped
+            if not iconRenderConnection then
+                iconRenderConnection = RunService.RenderStepped:Connect(updateIconPosition)
+            end
         end
     end)
     
     -- Завершаем перетаскивание иконки
     IconBtn.InputEnded:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or 
+            input.UserInputType == Enum.UserInputType.Touch) and draggingIcon then
+            draggingIcon = false
+            
+            -- Отключаем обновление позиции
+            if iconRenderConnection then
+                iconRenderConnection:Disconnect()
+                iconRenderConnection = nil
+            end
+            
+            -- Для тач-устройств разблокируем камеру
+            if input.UserInputType == Enum.UserInputType.Touch then
+                unblockCamera()
+            end
+        end
+    end)
+    
+    -- Также обрабатываем отмену перетаскивания, если курсор/тач вышел за пределы
+    UserInputService.InputEnded:Connect(function(input)
+        -- Для главного окна
+        if draggingMain and (input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch) then
+            draggingMain = false
+            
+            if mainRenderConnection then
+                mainRenderConnection:Disconnect()
+                mainRenderConnection = nil
+            end
+            
+            if input.UserInputType == Enum.UserInputType.Touch then
+                unblockCamera()
+            end
+        end
+        
+        -- Для иконки
         if draggingIcon and (input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch) then
             draggingIcon = false
             
-            -- Для тач-устройств разблокируем камеру
+            if iconRenderConnection then
+                iconRenderConnection:Disconnect()
+                iconRenderConnection = nil
+            end
+            
             if input.UserInputType == Enum.UserInputType.Touch then
                 unblockCamera()
             end
@@ -242,6 +308,18 @@ function BdevLib:CreateWindow(options)
             -- Не начинаем перетаскивание сразу, ждем немного
             local startTime = tick()
             local startPos = input.Position
+            local wasDragged = false
+            
+            -- Обработчик изменения ввода
+            local function onInputChanged()
+                if not wasDragged then
+                    local currentPos = UserInputService:GetMouseLocation()
+                    local distance = (currentPos - startPos).Magnitude
+                    if distance > 5 then  -- Если переместили более чем на 5 пикселей
+                        wasDragged = true
+                    end
+                end
+            end
             
             -- Обработчик конца ввода
             local connection
@@ -251,13 +329,13 @@ function BdevLib:CreateWindow(options)
                     
                     -- Проверяем, было ли это короткое нажатие (не перетаскивание)
                     local endTime = tick()
-                    local endPos = input.Position
-                    local distance = (endPos - startPos).Magnitude
                     
-                    if (endTime - startTime < 0.3) and (distance < 10) then
+                    if (endTime - startTime < 0.3) and not wasDragged then
                         -- Это был клик/тап, а не перетаскивание
                         toggleMenu()
                     end
+                else
+                    onInputChanged()
                 end
             end)
         end
@@ -331,17 +409,48 @@ function BdevLib:CreateWindow(options)
             end
         end
         
+        -- Функция для анимации изменения цвета кнопки
+        local function animateButtonColor()
+            -- Сохраняем оригинальный цвет
+            local originalColor = Color3.fromRGB(255, 255, 255)
+            local redColor = Color3.fromRGB(255, 50, 50) -- Красный цвет
+            
+            -- Создаем плавную анимацию для перехода к красному цвету
+            local toRedTween = TweenService:Create(
+                ClickBtn,
+                TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {BackgroundColor3 = redColor}
+            )
+            
+            -- Создаем плавную анимацию для возврата к белому цвету
+            local toWhiteTween = TweenService:Create(
+                ClickBtn,
+                TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {BackgroundColor3 = originalColor}
+            )
+            
+            -- Запускаем анимацию красного цвета
+            toRedTween:Play()
+            
+            -- Ждем 2.5 секунды (с учетом времени анимации красного цвета)
+            wait(2.5)
+            
+            -- Запускаем анимацию возврата к белому цвету
+            toWhiteTween:Play()
+        end
+        
         -- Универсальный обработчик клика (работает и на ПК, и на мобильных)
         ClickBtn.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or 
                input.UserInputType == Enum.UserInputType.Touch then
-                -- Визуальная обратная связь
-                ClickBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-                
                 -- Для тач-устройств временно блокируем камеру
                 if input.UserInputType == Enum.UserInputType.Touch then
                     blockCamera()
                 end
+                
+                -- Флаг для отслеживания, был ли вызван callback
+                local callbackCalled = false
+                local animationStarted = false
                 
                 -- Обработчик конца ввода
                 local connection
@@ -349,9 +458,17 @@ function BdevLib:CreateWindow(options)
                     if input.UserInputState == Enum.UserInputState.End then
                         connection:Disconnect()
                         
-                        -- Возвращаем цвет и вызываем callback
-                        ClickBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                        handleButtonClick()
+                        -- Запускаем анимацию изменения цвета
+                        if not animationStarted then
+                            animationStarted = true
+                            task.spawn(animateButtonColor)
+                        end
+                        
+                        -- Вызываем callback, если еще не вызывали
+                        if not callbackCalled then
+                            callbackCalled = true
+                            handleButtonClick()
+                        end
                         
                         -- Разблокируем камеру для тач-устройств
                         if input.UserInputType == Enum.UserInputType.Touch then
@@ -367,7 +484,20 @@ function BdevLib:CreateWindow(options)
         
         return {
             Button = Button,
-            Click = ClickBtn
+            Click = ClickBtn,
+            -- Добавляем метод для ручного управления цветом
+            SetColor = function(color)
+                local tween = TweenService:Create(
+                    ClickBtn,
+                    TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {BackgroundColor3 = color}
+                )
+                tween:Play()
+            end,
+            -- Метод для анимации красного цвета
+            FlashRed = function()
+                animateButtonColor()
+            end
         }
     end
 
@@ -503,9 +633,6 @@ function BdevLib:CreateWindow(options)
         ToggleBtn.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or 
                input.UserInputType == Enum.UserInputType.Touch then
-                -- Визуальная обратная связь
-                ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-                
                 -- Для тач-устройств временно блокируем камеру
                 if input.UserInputType == Enum.UserInputType.Touch then
                     blockCamera()
@@ -517,8 +644,7 @@ function BdevLib:CreateWindow(options)
                     if input.UserInputState == Enum.UserInputState.End then
                         connection:Disconnect()
                         
-                        -- Возвращаем цвет и переключаем
-                        ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                        -- Переключаем
                         toggleFunction()
                         
                         -- Разблокируем камеру для тач-устройств
