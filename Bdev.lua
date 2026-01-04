@@ -83,12 +83,10 @@ function BdevLib:CreateWindow(options)
     Window.Position = UDim2.new(0, 0, 0.15289256, 0)
     Window.Size = UDim2.new(0, 193, 0, 205)
     
-    -- Автоматическое расположение элементов
     UIListLayout.Parent = Window
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIListLayout.Padding = UDim.new(0, 8)
     
-    -- Отступ сверху, чтобы кнопки не заходили в TopBar
     UIPadding.Parent = Window
     UIPadding.PaddingTop = UDim.new(0, 10)
 
@@ -106,8 +104,8 @@ function BdevLib:CreateWindow(options)
 
     local elementCount = 0
     local topBarHeight = 37
-    local paddingTop = 10 -- Отступ от TopBar
-    local minPadding = 20 -- Минимальный отступ снизу
+    local paddingTop = 10
+    local minPadding = 20
     local buttonHeight = 27
     local toggleHeight = 17
     local spacing = 8
@@ -116,7 +114,6 @@ function BdevLib:CreateWindow(options)
         local totalElementsHeight = 0
         local childCount = 0
         
-        -- Считаем высоту всех элементов
         for _, child in ipairs(Window:GetChildren()) do
             if child:IsA("Frame") and (child.Name == "Button" or child.Name == "Tbutton") then
                 totalElementsHeight = totalElementsHeight + (child.Name == "Button" and buttonHeight or toggleHeight)
@@ -124,26 +121,20 @@ function BdevLib:CreateWindow(options)
             end
         end
         
-        -- Добавляем отступы между элементами
         if childCount > 0 then
             totalElementsHeight = totalElementsHeight + (spacing * (childCount - 1))
         end
         
-        -- Добавляем верхний отступ (от TopBar) и нижний отступ
         local newWindowHeight = paddingTop + totalElementsHeight + minPadding
         
-        -- Минимальная высота окна с учетом отступов
         local minWindowHeight = paddingTop + minPadding
         newWindowHeight = math.max(minWindowHeight, newWindowHeight)
         
-        -- Общая высота Main = TopBar + Window
         local newMainHeight = topBarHeight + newWindowHeight
         
-        -- Обновляем размеры
         Main.Size = UDim2.new(0, 193, 0, newMainHeight)
         Window.Size = UDim2.new(0, 193, 0, newWindowHeight)
         
-        -- Обновляем позицию окна (оно всегда должно быть под TopBar)
         Window.Position = UDim2.new(0, 0, 0, topBarHeight)
     end
 
@@ -362,7 +353,7 @@ function BdevLib:CreateWindow(options)
         Button.BackgroundTransparency = 1.000
         Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
         Button.BorderSizePixel = 0
-        Button.Size = UDim2.new(0, 192, 0, 27)
+        Button.Size = UDim2.new(0, 192, 0, 32)
 
         UIListLayout_2.Parent = Button
         UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
@@ -377,7 +368,7 @@ function BdevLib:CreateWindow(options)
         ClickBtn.BorderColor3 = Color3.fromRGB(0, 0, 0)
         ClickBtn.BorderSizePixel = 0
         ClickBtn.Position = UDim2.new(-6.0550758e-07, 0, 0, 0)
-        ClickBtn.Size = UDim2.new(0, 38, 0, 22)
+        ClickBtn.Size = UDim2.new(0, 38, 0, 27)
         ClickBtn.Font = Enum.Font.SourceSans
         ClickBtn.Text = ""
         ClickBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
@@ -393,16 +384,19 @@ function BdevLib:CreateWindow(options)
         FunText.BackgroundTransparency = 1.000
         FunText.BorderColor3 = Color3.fromRGB(0, 0, 0)
         FunText.BorderSizePixel = 0
-        FunText.Position = UDim2.new(-3.56926203, 0, -0.0389612354, 0)
-        FunText.Size = UDim2.new(0, 72, 0, 20)
+        FunText.Position = UDim2.new(-3.56926203, 0, 0, 0)
+        FunText.Size = UDim2.new(0, 140, 0, 27)
         FunText.Font = Enum.Font.Jura
         FunText.Text = options.Name or "Click"
         FunText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        FunText.TextScaled = true
-        FunText.TextSize = 16
+        FunText.TextScaled = false
+        FunText.TextSize = 14
         FunText.TextWrapped = true
+        FunText.TextXAlignment = Enum.TextXAlignment.Left
+        FunText.TextYAlignment = Enum.TextYAlignment.Center
 
         elementCount = elementCount + 1
+        buttonHeight = 32
         
         local function handleButtonClick()
             if options.Callback then
@@ -508,7 +502,7 @@ function BdevLib:CreateWindow(options)
         Tbutton.BackgroundTransparency = 1.000
         Tbutton.BorderColor3 = Color3.fromRGB(0, 0, 0)
         Tbutton.BorderSizePixel = 0
-        Tbutton.Size = UDim2.new(0, 192, 0, 17)
+        Tbutton.Size = UDim2.new(0, 192, 0, 22)
 
         UIListLayout.Parent = Tbutton
         UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -523,7 +517,7 @@ function BdevLib:CreateWindow(options)
         ToggleBtn.BorderColor3 = Color3.fromRGB(0, 0, 0)
         ToggleBtn.BorderSizePixel = 0
         ToggleBtn.Position = UDim2.new(1.19108284, 0, 0, 0)
-        ToggleBtn.Size = UDim2.new(0, 39, 0, 16)
+        ToggleBtn.Size = UDim2.new(0, 39, 0, 21)
         ToggleBtn.Font = Enum.Font.SourceSans
         ToggleBtn.Text = ""
         ToggleBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
@@ -539,7 +533,7 @@ function BdevLib:CreateWindow(options)
         Background.BorderColor3 = Color3.fromRGB(0, 0, 0)
         Background.BorderSizePixel = 0
         Background.Position = UDim2.new(-0.00180601457, 0, 0, 0)
-        Background.Size = UDim2.new(0, 39, 0, 16)
+        Background.Size = UDim2.new(0, 39, 0, 21)
 
         UICorner_4.CornerRadius = UDim.new(1, 2)
         UICorner_4.Parent = Background
@@ -549,9 +543,8 @@ function BdevLib:CreateWindow(options)
         Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         Circle.BorderColor3 = Color3.fromRGB(0, 0, 0)
         Circle.BorderSizePixel = 0
-        Circle.Size = UDim2.new(0, 16, 0, 16)
-        
-        Circle.Position = toggled and UDim2.new(0.59, 0, 0, 0) or UDim2.new(0.025, 0, 0, 0)
+        Circle.Size = UDim2.new(0, 17, 0, 17)
+        Circle.Position = toggled and UDim2.new(0.59, 0, 0, 2) or UDim2.new(0.025, 0, 0, 2)
 
         UICorner_5.CornerRadius = UDim.new(1, 2)
         UICorner_5.Parent = Circle
@@ -562,23 +555,26 @@ function BdevLib:CreateWindow(options)
         NameFunction.BackgroundTransparency = 1.000
         NameFunction.BorderColor3 = Color3.fromRGB(0, 0, 0)
         NameFunction.BorderSizePixel = 0
-        NameFunction.Position = UDim2.new(-3.4777832, 0, -0.125, 0)
-        NameFunction.Size = UDim2.new(0, 72, 0, 20)
+        NameFunction.Position = UDim2.new(-3.4777832, 0, 0, 0)
+        NameFunction.Size = UDim2.new(0, 140, 0, 21)
         NameFunction.Font = Enum.Font.Jura
         NameFunction.Text = options.Name or "Toggle"
         NameFunction.TextColor3 = Color3.fromRGB(255, 255, 255)
-        NameFunction.TextScaled = true
-        NameFunction.TextSize = 16
+        NameFunction.TextScaled = false
+        NameFunction.TextSize = 14
         NameFunction.TextWrapped = true
+        NameFunction.TextXAlignment = Enum.TextXAlignment.Left
+        NameFunction.TextYAlignment = Enum.TextYAlignment.Center
 
         elementCount = elementCount + 1
+        toggleHeight = 22
         
         local function updateToggle()
             local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
             
             if toggled then
                 local circleTween = TweenService:Create(Circle, tweenInfo, {
-                    Position = UDim2.new(0.59, 0, 0, 0)
+                    Position = UDim2.new(0.59, 0, 0, 2)
                 })
                 local bgTween = TweenService:Create(Background, tweenInfo, {
                     BackgroundColor3 = Color3.fromRGB(0, 200, 0)
@@ -588,7 +584,7 @@ function BdevLib:CreateWindow(options)
                 bgTween:Play()
             else
                 local circleTween = TweenService:Create(Circle, tweenInfo, {
-                    Position = UDim2.new(0.025, 0, 0, 0)
+                    Position = UDim2.new(0.025, 0, 0, 2)
                 })
                 local bgTween = TweenService:Create(Background, tweenInfo, {
                     BackgroundColor3 = Color3.fromRGB(60, 60, 60)
