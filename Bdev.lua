@@ -110,6 +110,9 @@ function BdevLib:CreateWindow(options)
     local mainRenderConnection
     local iconRenderConnection
     
+    -- Текущее активное касание для телефона
+    local currentTouchInput
+    
     -- Функции для блокировки камеры
     local function blockCamera()
         -- Блокируем стандартное управление камерой на мобильных устройствах
@@ -135,10 +138,29 @@ function BdevLib:CreateWindow(options)
         end
     end
     
+    -- Универсальная функция получения позиции ввода
+    local function getInputPosition(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            -- Для тач-устройств используем позицию касания
+            return input.Position
+        else
+            -- Для мыши используем позицию мыши
+            return UserInputService:GetMouseLocation()
+        end
+    end
+    
     -- Функция обновления позиции главного окна через RenderStepped
     local function updateMainPosition()
         if draggingMain then
-            local mousePos = UserInputService:GetMouseLocation()
+            local mousePos
+            if currentTouchInput and UserInputService.TouchEnabled then
+                -- Для телефона используем текущий тач-ввод
+                mousePos = currentTouchInput.Position
+            else
+                -- Для ПК используем позицию мыши
+                mousePos = UserInputService:GetMouseLocation()
+            end
+            
             local screenSize = BdevUI.AbsoluteSize
             
             -- Вычисляем новую позицию с учетом смещения
@@ -157,7 +179,15 @@ function BdevLib:CreateWindow(options)
     -- Функция обновления позиции иконки через RenderStepped
     local function updateIconPosition()
         if draggingIcon then
-            local mousePos = UserInputService:GetMouseLocation()
+            local mousePos
+            if currentTouchInput and UserInputService.TouchEnabled then
+                -- Для телефона используем текущий тач-ввод
+                mousePos = currentTouchInput.Position
+            else
+                -- Для ПК используем позицию мыши
+                mousePos = UserInputService:GetMouseLocation()
+            end
+            
             local screenSize = BdevUI.AbsoluteSize
             
             -- Вычисляем новую позицию с учетом смещения
@@ -180,12 +210,15 @@ function BdevLib:CreateWindow(options)
             -- Для тач-устройств блокируем камеру
             if input.UserInputType == Enum.UserInputType.Touch then
                 blockCamera()
+                currentTouchInput = input
             end
             
+            -- Получаем позицию ввода
+            local inputPos = getInputPosition(input)
+            
             -- Запоминаем смещение от угла элемента до точки нажатия
-            local mousePos = UserInputService:GetMouseLocation()
             local elementPos = Main.AbsolutePosition
-            mainDragOffset = Vector2.new(mousePos.X - elementPos.X, mousePos.Y - elementPos.Y)
+            mainDragOffset = Vector2.new(inputPos.X - elementPos.X, inputPos.Y - elementPos.Y)
             
             -- Начинаем перетаскивание
             draggingMain = true
@@ -194,6 +227,13 @@ function BdevLib:CreateWindow(options)
             if not mainRenderConnection then
                 mainRenderConnection = RunService.RenderStepped:Connect(updateMainPosition)
             end
+        end
+    end)
+    
+    -- Обрабатываем изменение позиции касания для главного окна
+    TopBar.InputChanged:Connect(function(input)
+        if draggingMain and input.UserInputType == Enum.UserInputType.Touch then
+            currentTouchInput = input
         end
     end)
     
@@ -209,8 +249,9 @@ function BdevLib:CreateWindow(options)
                 mainRenderConnection = nil
             end
             
-            -- Для тач-устройств разблокируем камеру
+            -- Сбрасываем текущее касание
             if input.UserInputType == Enum.UserInputType.Touch then
+                currentTouchInput = nil
                 unblockCamera()
             end
         end
@@ -223,12 +264,15 @@ function BdevLib:CreateWindow(options)
             -- Для тач-устройств блокируем камеру
             if input.UserInputType == Enum.UserInputType.Touch then
                 blockCamera()
+                currentTouchInput = input
             end
             
+            -- Получаем позицию ввода
+            local inputPos = getInputPosition(input)
+            
             -- Запоминаем смещение от угла элемента до точки нажатия
-            local mousePos = UserInputService:GetMouseLocation()
             local elementPos = IconBtn.AbsolutePosition
-            iconDragOffset = Vector2.new(mousePos.X - elementPos.X, mousePos.Y - elementPos.Y)
+            iconDragOffset = Vector2.new(inputPos.X - elementPos.X, inputPos.Y - elementPos.Y)
             
             -- Начинаем перетаскивание
             draggingIcon = true
@@ -237,6 +281,13 @@ function BdevLib:CreateWindow(options)
             if not iconRenderConnection then
                 iconRenderConnection = RunService.RenderStepped:Connect(updateIconPosition)
             end
+        end
+    end)
+    
+    -- Обрабатываем изменение позиции касания для иконки
+    IconBtn.InputChanged:Connect(function(input)
+        if draggingIcon and input.UserInputType == Enum.UserInputType.Touch then
+            currentTouchInput = input
         end
     end)
     
@@ -252,8 +303,9 @@ function BdevLib:CreateWindow(options)
                 iconRenderConnection = nil
             end
             
-            -- Для тач-устройств разблокируем камеру
+            -- Сбрасываем текущее касание
             if input.UserInputType == Enum.UserInputType.Touch then
+                currentTouchInput = nil
                 unblockCamera()
             end
         end
@@ -272,6 +324,7 @@ function BdevLib:CreateWindow(options)
             end
             
             if input.UserInputType == Enum.UserInputType.Touch then
+                currentTouchInput = nil
                 unblockCamera()
             end
         end
@@ -287,6 +340,7 @@ function BdevLib:CreateWindow(options)
             end
             
             if input.UserInputType == Enum.UserInputType.Touch then
+                currentTouchInput = nil
                 unblockCamera()
             end
         end
@@ -307,13 +361,13 @@ function BdevLib:CreateWindow(options)
            input.UserInputType == Enum.UserInputType.Touch then
             -- Не начинаем перетаскивание сразу, ждем немного
             local startTime = tick()
-            local startPos = input.Position
+            local startPos = getInputPosition(input)
             local wasDragged = false
             
             -- Обработчик изменения ввода
             local function onInputChanged()
                 if not wasDragged then
-                    local currentPos = UserInputService:GetMouseLocation()
+                    local currentPos = getInputPosition(input)
                     local distance = (currentPos - startPos).Magnitude
                     if distance > 5 then  -- Если переместили более чем на 5 пикселей
                         wasDragged = true
@@ -413,13 +467,13 @@ function BdevLib:CreateWindow(options)
         local function animateButtonColor()
             -- Сохраняем оригинальный цвет
             local originalColor = Color3.fromRGB(255, 255, 255)
-            local redColor = Color3.fromRGB(255, 50, 50) -- Красный цвет
+            local greenColor = Color3.fromRGB(50, 255, 50) -- Зеленый цвет
             
-            -- Создаем плавную анимацию для перехода к красному цвету
-            local toRedTween = TweenService:Create(
+            -- Создаем плавную анимацию для перехода к зеленому цвету
+            local toGreenTween = TweenService:Create(
                 ClickBtn,
                 TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                {BackgroundColor3 = redColor}
+                {BackgroundColor3 = greenColor}
             )
             
             -- Создаем плавную анимацию для возврата к белому цвету
@@ -429,11 +483,11 @@ function BdevLib:CreateWindow(options)
                 {BackgroundColor3 = originalColor}
             )
             
-            -- Запускаем анимацию красного цвета
-            toRedTween:Play()
+            -- Запускаем анимацию зеленого цвета
+            toGreenTween:Play()
             
-            -- Ждем 2.5 секунды (с учетом времени анимации красного цвета)
-            wait(2.5)
+            -- Ждем 2.5 секунды (с учетом времени анимации зеленого цвета)
+            task.wait(2.5)
             
             -- Запускаем анимацию возврата к белому цвету
             toWhiteTween:Play()
@@ -494,9 +548,30 @@ function BdevLib:CreateWindow(options)
                 )
                 tween:Play()
             end,
-            -- Метод для анимации красного цвета
-            FlashRed = function()
+            -- Метод для анимации зеленого цвета
+            FlashGreen = function()
                 animateButtonColor()
+            end,
+            -- Метод для анимации любого цвета
+            FlashColor = function(color, duration)
+                duration = duration or 2.5
+                local originalColor = ClickBtn.BackgroundColor3
+                
+                local toColorTween = TweenService:Create(
+                    ClickBtn,
+                    TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {BackgroundColor3 = color}
+                )
+                
+                local toOriginalTween = TweenService:Create(
+                    ClickBtn,
+                    TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {BackgroundColor3 = originalColor}
+                )
+                
+                toColorTween:Play()
+                task.wait(duration)
+                toOriginalTween:Play()
             end
         }
     end
