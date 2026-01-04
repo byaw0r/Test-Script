@@ -98,18 +98,24 @@ function BdevLib:CreateWindow(options)
     UICorner_7.CornerRadius = UDim.new(1.5, 0)
     UICorner_7.Parent = IconBtn
 
-    -- Улучшенная система перетаскивания для мобильных устройств
+    -- Флаги для отслеживания перетаскивания
     local draggingMain = false
     local draggingIcon = false
+    
+    -- Позиции для перетаскивания
     local mainDragOffset = Vector2.new(0, 0)
     local iconDragOffset = Vector2.new(0, 0)
     
-    -- Активное касание для каждого элемента отдельно
-    local currentMainTouch = nil
-    local currentIconTouch = nil
+    -- Соединения для обновления позиций
+    local mainRenderConnection
+    local iconRenderConnection
+    
+    -- Текущее активное касание для телефона
+    local currentTouchInput
     
     -- Функции для блокировки камеры
     local function blockCamera()
+        -- Блокируем стандартное управление камерой на мобильных устройствах
         if UserInputService.TouchEnabled then
             ContextActionService:BindAction(
                 "BlockCameraWhileDragging",
@@ -118,7 +124,7 @@ function BdevLib:CreateWindow(options)
                 Enum.UserInputType.Touch
             )
             
-            -- Отключаем управление камерой при касании
+            -- Также блокируем сенсорное управление камерой
             if player.Character and player.Character:FindFirstChild("Humanoid") then
                 player.Character.Humanoid.CameraOffset = Vector3.new(0, 0, 0)
             end
@@ -126,187 +132,270 @@ function BdevLib:CreateWindow(options)
     end
     
     local function unblockCamera()
+        -- Разблокируем управление камерой
         if UserInputService.TouchEnabled then
             ContextActionService:UnbindAction("BlockCameraWhileDragging")
         end
     end
     
-    -- Общая функция для начала перетаскивания
-    local function startDragging(element, touch, isMain)
-        -- Определяем смещение
-        local elementPos = element.AbsolutePosition
-        local touchPos = touch.Position
-        local offset = Vector2.new(touchPos.X - elementPos.X, touchPos.Y - elementPos.Y)
-        
-        -- Блокируем камеру для тач-устройств
-        if UserInputService.TouchEnabled then
-            blockCamera()
-        end
-        
-        -- Устанавливаем флаги и смещения
-        if isMain then
-            draggingMain = true
-            mainDragOffset = offset
-            currentMainTouch = touch
+    -- Универсальная функция получения позиции ввода
+    local function getInputPosition(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            -- Для тач-устройств используем позицию касания
+            return input.Position
         else
-            draggingIcon = true
-            iconDragOffset = offset
-            currentIconTouch = touch
-        end
-        
-        return offset
-    end
-    
-    -- Обновление позиции элемента с учетом ограничений экрана
-    local function updateElementPosition(element, touchPos, offset, isMain)
-        local screenSize = BdevUI.AbsoluteSize
-        
-        -- Вычисляем новую позицию
-        local newX = touchPos.X - offset.X
-        local newY = touchPos.Y - offset.Y
-        
-        -- Ограничиваем в пределах экрана
-        local elementSize = element.AbsoluteSize
-        newX = math.clamp(newX, 0, screenSize.X - elementSize.X)
-        newY = math.clamp(newY, 0, screenSize.Y - elementSize.Y)
-        
-        -- Применяем позицию
-        element.Position = UDim2.new(0, newX, 0, newY)
-    end
-    
-    -- Обработка перетаскивания главного окна
-    local function handleMainDrag()
-        if draggingMain and currentMainTouch then
-            local touchPos = currentMainTouch.Position
-            updateElementPosition(Main, touchPos, mainDragOffset, true)
+            -- Для мыши используем позицию мыши
+            return UserInputService:GetMouseLocation()
         end
     end
     
-    -- Обработка перетаскивания иконки
-    local function handleIconDrag()
-        if draggingIcon and currentIconTouch then
-            local touchPos = currentIconTouch.Position
-            updateElementPosition(IconBtn, touchPos, iconDragOffset, false)
+    -- Функция обновления позиции главного окна через RenderStepped
+    local function updateMainPosition()
+        if draggingMain then
+            local mousePos
+            if currentTouchInput and UserInputService.TouchEnabled then
+                -- Для телефона используем текущий тач-ввод
+                mousePos = currentTouchInput.Position
+            else
+                -- Для ПК используем позицию мыши
+                mousePos = UserInputService:GetMouseLocation()
+            end
+            
+            local screenSize = BdevUI.AbsoluteSize
+            
+            -- Вычисляем новую позицию с учетом смещения
+            local newX = mousePos.X - mainDragOffset.X
+            local newY = mousePos.Y - mainDragOffset.Y
+            
+            -- Ограничиваем позицию в пределах экрана
+            newX = math.clamp(newX, 0, screenSize.X - Main.AbsoluteSize.X)
+            newY = math.clamp(newY, 0, screenSize.Y - Main.AbsoluteSize.Y)
+            
+            -- Устанавливаем новую позицию
+            Main.Position = UDim2.new(0, newX, 0, newY)
         end
     end
     
-    -- Подключаем RenderStepped для плавного перемещения
-    RunService.RenderStepped:Connect(function()
-        handleMainDrag()
-        handleIconDrag()
-    end)
+    -- Функция обновления позиции иконки через RenderStepped
+    local function updateIconPosition()
+        if draggingIcon then
+            local mousePos
+            if currentTouchInput and UserInputService.TouchEnabled then
+                -- Для телефона используем текущий тач-ввод
+                mousePos = currentTouchInput.Position
+            else
+                -- Для ПК используем позицию мыши
+                mousePos = UserInputService:GetMouseLocation()
+            end
+            
+            local screenSize = BdevUI.AbsoluteSize
+            
+            -- Вычисляем новую позицию с учетом смещения
+            local newX = mousePos.X - iconDragOffset.X
+            local newY = mousePos.Y - iconDragOffset.Y
+            
+            -- Ограничиваем позицию в пределах экрана
+            newX = math.clamp(newX, 0, screenSize.X - IconBtn.AbsoluteSize.X)
+            newY = math.clamp(newY, 0, screenSize.Y - IconBtn.AbsoluteSize.Y)
+            
+            -- Устанавливаем новую позицию
+            IconBtn.Position = UDim2.new(0, newX, 0, newY)
+        end
+    end
     
-    -- Обработка событий для главного окна
+    -- Начинаем перетаскивание главного окна
     TopBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
-            startDragging(Main, input, true)
-        end
-    end)
-    
-    TopBar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            if draggingMain and currentMainTouch and currentMainTouch == input then
-                currentMainTouch = input
+            -- Для тач-устройств блокируем камеру
+            if input.UserInputType == Enum.UserInputType.Touch then
+                blockCamera()
+                currentTouchInput = input
+            end
+            
+            -- Получаем позицию ввода
+            local inputPos = getInputPosition(input)
+            
+            -- Запоминаем смещение от угла элемента до точки нажатия
+            local elementPos = Main.AbsolutePosition
+            mainDragOffset = Vector2.new(inputPos.X - elementPos.X, inputPos.Y - elementPos.Y)
+            
+            -- Начинаем перетаскивание
+            draggingMain = true
+            
+            -- Запускаем обновление позиции через RenderStepped
+            if not mainRenderConnection then
+                mainRenderConnection = RunService.RenderStepped:Connect(updateMainPosition)
             end
         end
     end)
     
+    -- Обрабатываем изменение позиции касания для главного окна
+    TopBar.InputChanged:Connect(function(input)
+        if draggingMain and input.UserInputType == Enum.UserInputType.Touch then
+            currentTouchInput = input
+        end
+    end)
+    
+    -- Завершаем перетаскивание главного окна
     TopBar.InputEnded:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or 
             input.UserInputType == Enum.UserInputType.Touch) and draggingMain then
             draggingMain = false
-            currentMainTouch = nil
-            unblockCamera()
-        end
-    end)
-    
-    -- Обработка событий для иконки
-    IconBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
-            startDragging(IconBtn, input, false)
-        end
-    end)
-    
-    IconBtn.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            if draggingIcon and currentIconTouch and currentIconTouch == input then
-                currentIconTouch = input
+            
+            -- Отключаем обновление позиции
+            if mainRenderConnection then
+                mainRenderConnection:Disconnect()
+                mainRenderConnection = nil
+            end
+            
+            -- Сбрасываем текущее касание
+            if input.UserInputType == Enum.UserInputType.Touch then
+                currentTouchInput = nil
+                unblockCamera()
             end
         end
     end)
     
+    -- Начинаем перетаскивание иконки
+    IconBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            -- Для тач-устройств блокируем камеру
+            if input.UserInputType == Enum.UserInputType.Touch then
+                blockCamera()
+                currentTouchInput = input
+            end
+            
+            -- Получаем позицию ввода
+            local inputPos = getInputPosition(input)
+            
+            -- Запоминаем смещение от угла элемента до точки нажатия
+            local elementPos = IconBtn.AbsolutePosition
+            iconDragOffset = Vector2.new(inputPos.X - elementPos.X, inputPos.Y - elementPos.Y)
+            
+            -- Начинаем перетаскивание
+            draggingIcon = true
+            
+            -- Запускаем обновление позиции через RenderStepped
+            if not iconRenderConnection then
+                iconRenderConnection = RunService.RenderStepped:Connect(updateIconPosition)
+            end
+        end
+    end)
+    
+    -- Обрабатываем изменение позиции касания для иконки
+    IconBtn.InputChanged:Connect(function(input)
+        if draggingIcon and input.UserInputType == Enum.UserInputType.Touch then
+            currentTouchInput = input
+        end
+    end)
+    
+    -- Завершаем перетаскивание иконки
     IconBtn.InputEnded:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or 
             input.UserInputType == Enum.UserInputType.Touch) and draggingIcon then
             draggingIcon = false
-            currentIconTouch = nil
-            unblockCamera()
+            
+            -- Отключаем обновление позиции
+            if iconRenderConnection then
+                iconRenderConnection:Disconnect()
+                iconRenderConnection = nil
+            end
+            
+            -- Сбрасываем текущее касание
+            if input.UserInputType == Enum.UserInputType.Touch then
+                currentTouchInput = nil
+                unblockCamera()
+            end
         end
     end)
     
-    -- Глобальная отмена перетаскивания при потере фокуса
-    UserInputService.TouchEnded:Connect(function(touch)
-        if currentMainTouch == touch then
+    -- Также обрабатываем отмену перетаскивания, если курсор/тач вышел за пределы
+    UserInputService.InputEnded:Connect(function(input)
+        -- Для главного окна
+        if draggingMain and (input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch) then
             draggingMain = false
-            currentMainTouch = nil
-            unblockCamera()
+            
+            if mainRenderConnection then
+                mainRenderConnection:Disconnect()
+                mainRenderConnection = nil
+            end
+            
+            if input.UserInputType == Enum.UserInputType.Touch then
+                currentTouchInput = nil
+                unblockCamera()
+            end
         end
-        if currentIconTouch == touch then
+        
+        -- Для иконки
+        if draggingIcon and (input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch) then
             draggingIcon = false
-            currentIconTouch = nil
-            unblockCamera()
+            
+            if iconRenderConnection then
+                iconRenderConnection:Disconnect()
+                iconRenderConnection = nil
+            end
+            
+            if input.UserInputType == Enum.UserInputType.Touch then
+                currentTouchInput = nil
+                unblockCamera()
+            end
         end
     end)
-    
+
     -- Функционал открытия/закрытия меню
     local isOpen = false
-    local lastTapTime = 0
     
+    -- Функция для открытия/закрытия меню
     local function toggleMenu()
         isOpen = not isOpen
         Main.Visible = isOpen
     end
     
-    -- Улучшенный обработчик клика для иконки
+    -- Универсальный обработчик клика для иконки (работает и на ПК, и на мобильных)
     IconBtn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or 
            input.UserInputType == Enum.UserInputType.Touch then
-            
+            -- Не начинаем перетаскивание сразу, ждем немного
             local startTime = tick()
-            local startPos = input.Position
-            local isDragging = false
+            local startPos = getInputPosition(input)
+            local wasDragged = false
             
-            -- Отслеживаем движение для определения перетаскивания
-            local moveConnection
-            moveConnection = input.Changed:Connect(function()
+            -- Обработчик изменения ввода
+            local function onInputChanged()
+                if not wasDragged then
+                    local currentPos = getInputPosition(input)
+                    local distance = (currentPos - startPos).Magnitude
+                    if distance > 5 then  -- Если переместили более чем на 5 пикселей
+                        wasDragged = true
+                    end
+                end
+            end
+            
+            -- Обработчик конца ввода
+            local connection
+            connection = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
-                    moveConnection:Disconnect()
+                    connection:Disconnect()
                     
-                    -- Проверяем, был ли это тап (маленькое перемещение и короткое время)
-                    local currentTime = tick()
-                    local timeDiff = currentTime - startTime
+                    -- Проверяем, было ли это короткое нажатие (не перетаскивание)
+                    local endTime = tick()
                     
-                    if timeDiff < 0.3 and not isDragging then
-                        -- Это был тап - открываем/закрываем меню
+                    if (endTime - startTime < 0.3) and not wasDragged then
+                        -- Это был клик/тап, а не перетаскивание
                         toggleMenu()
                     end
                 else
-                    -- Проверяем перемещение
-                    if not isDragging then
-                        local currentPos = input.Position
-                        local distance = (currentPos - startPos).Magnitude
-                        if distance > 10 then -- Порог для определения перетаскивания
-                            isDragging = true
-                        end
-                    end
+                    onInputChanged()
                 end
             end)
         end
     end)
 
-    -- Счетчик для Y-позиции
+    -- Счетчик для Y-позиции (будем увеличивать при создании новых элементов)
     local currentYOffset = 8
 
     -- Функция для создания кнопки
@@ -327,6 +416,7 @@ function BdevLib:CreateWindow(options)
         Button.Position = UDim2.new(0.00420162221, 0, 0, currentYOffset)
         Button.Size = UDim2.new(0, 192, 0, 27)
 
+        -- UIListLayout внутри Button
         UIListLayout_2.Parent = Button
         UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
         UIListLayout_2.Padding = UDim.new(0, 8)
@@ -350,6 +440,7 @@ function BdevLib:CreateWindow(options)
         UICorner_6.CornerRadius = UDim.new(1, 0)
         UICorner_6.Parent = ClickBtn
 
+        -- Текст кнопки с точными позициями из твоего кода
         FunText.Name = "FunText"
         FunText.Parent = ClickBtn
         FunText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -374,65 +465,81 @@ function BdevLib:CreateWindow(options)
         
         -- Функция для анимации изменения цвета кнопки
         local function animateButtonColor()
+            -- Сохраняем оригинальный цвет
             local originalColor = Color3.fromRGB(255, 255, 255)
-            local greenColor = Color3.fromRGB(50, 255, 50)
+            local greenColor = Color3.fromRGB(50, 255, 50) -- Зеленый цвет
             
+            -- Создаем плавную анимацию для перехода к зеленому цвету
             local toGreenTween = TweenService:Create(
                 ClickBtn,
                 TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                 {BackgroundColor3 = greenColor}
             )
             
+            -- Создаем плавную анимацию для возврата к белому цвету
             local toWhiteTween = TweenService:Create(
                 ClickBtn,
                 TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                 {BackgroundColor3 = originalColor}
             )
             
+            -- Запускаем анимацию зеленого цвета
             toGreenTween:Play()
+            
+            -- Ждем 2.5 секунды (с учетом времени анимации зеленого цвета)
             task.wait(2.5)
+            
+            -- Запускаем анимацию возврата к белому цвету
             toWhiteTween:Play()
         end
         
-        -- Универсальный обработчик клика
+        -- Универсальный обработчик клика (работает и на ПК, и на мобильных)
         ClickBtn.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or 
                input.UserInputType == Enum.UserInputType.Touch then
+                -- Для тач-устройств временно блокируем камеру
+                if input.UserInputType == Enum.UserInputType.Touch then
+                    blockCamera()
+                end
                 
-                local startTime = tick()
-                local wasDragged = false
+                -- Флаг для отслеживания, был ли вызван callback
+                local callbackCalled = false
+                local animationStarted = false
                 
-                -- Обработчик изменения ввода
+                -- Обработчик конца ввода
                 local connection
                 connection = input.Changed:Connect(function()
                     if input.UserInputState == Enum.UserInputState.End then
                         connection:Disconnect()
                         
-                        -- Проверяем время нажатия
-                        local endTime = tick()
-                        
-                        if (endTime - startTime < 0.5) and not wasDragged then
-                            -- Анимация и callback
+                        -- Запускаем анимацию изменения цвета
+                        if not animationStarted then
+                            animationStarted = true
                             task.spawn(animateButtonColor)
-                            task.spawn(handleButtonClick)
                         end
-                    else
-                        -- Проверяем, не было ли это перетаскивание
-                        if not wasDragged then
-                            -- Простая проверка на движение
-                            wasDragged = true
+                        
+                        -- Вызываем callback, если еще не вызывали
+                        if not callbackCalled then
+                            callbackCalled = true
+                            handleButtonClick()
+                        end
+                        
+                        -- Разблокируем камеру для тач-устройств
+                        if input.UserInputType == Enum.UserInputType.Touch then
+                            unblockCamera()
                         end
                     end
                 end)
             end
         end)
         
-        -- Увеличиваем Y-позицию
+        -- Увеличиваем Y-позицию для следующего элемента
         currentYOffset = currentYOffset + 35
         
         return {
             Button = Button,
             Click = ClickBtn,
+            -- Добавляем метод для ручного управления цветом
             SetColor = function(color)
                 local tween = TweenService:Create(
                     ClickBtn,
@@ -441,9 +548,11 @@ function BdevLib:CreateWindow(options)
                 )
                 tween:Play()
             end,
+            -- Метод для анимации зеленого цвета
             FlashGreen = function()
                 animateButtonColor()
             end,
+            -- Метод для анимации любого цвета
             FlashColor = function(color, duration)
                 duration = duration or 2.5
                 local originalColor = ClickBtn.BackgroundColor3
@@ -491,6 +600,7 @@ function BdevLib:CreateWindow(options)
         Tbutton.Position = UDim2.new(0, 0, 0, currentYOffset)
         Tbutton.Size = UDim2.new(0, 192, 0, 17)
 
+        -- UIListLayout внутри Tbutton
         UIListLayout.Parent = Tbutton
         UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
         UIListLayout.Padding = UDim.new(0, 8)
@@ -532,11 +642,13 @@ function BdevLib:CreateWindow(options)
         Circle.BorderSizePixel = 0
         Circle.Size = UDim2.new(0, 16, 0, 16)
         
+        -- Позиция круга в зависимости от состояния
         Circle.Position = toggled and UDim2.new(0.59, 0, 0, 0) or UDim2.new(0.025, 0, 0, 0)
 
         UICorner_5.CornerRadius = UDim.new(1, 2)
         UICorner_5.Parent = Circle
 
+        -- Текст переключателя с точными позициями из твоего кода
         NameFunction.Name = "NameFunction"
         NameFunction.Parent = ToggleBtn
         NameFunction.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -552,7 +664,7 @@ function BdevLib:CreateWindow(options)
         NameFunction.TextSize = 16
         NameFunction.TextWrapped = true
 
-        -- Функция переключения с анимацией
+        -- Функция переключения с анимацией круга
         local function updateToggle()
             local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
             
@@ -583,35 +695,43 @@ function BdevLib:CreateWindow(options)
             end
         end
 
+        -- Инициализируем начальное состояние
         updateToggle()
 
+        -- Функция для переключения тоггла
         local function toggleFunction()
             toggled = not toggled
             updateToggle()
         end
 
-        -- Упрощенный обработчик для тоггла
+        -- Универсальный обработчик клика (работает и на ПК, и на мобильных)
         ToggleBtn.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or 
                input.UserInputType == Enum.UserInputType.Touch then
+                -- Для тач-устройств временно блокируем камеру
+                if input.UserInputType == Enum.UserInputType.Touch then
+                    blockCamera()
+                end
                 
-                local startTime = tick()
-                
+                -- Обработчик конца ввода
                 local connection
                 connection = input.Changed:Connect(function()
                     if input.UserInputState == Enum.UserInputState.End then
                         connection:Disconnect()
                         
-                        -- Проверяем время нажатия
-                        local endTime = tick()
-                        if endTime - startTime < 0.5 then
-                            toggleFunction()
+                        -- Переключаем
+                        toggleFunction()
+                        
+                        -- Разблокируем камеру для тач-устройств
+                        if input.UserInputType == Enum.UserInputType.Touch then
+                            unblockCamera()
                         end
                     end
                 end)
             end
         end)
         
+        -- Увеличиваем Y-позицию для следующего элемента
         currentYOffset = currentYOffset + 25
         
         return {
